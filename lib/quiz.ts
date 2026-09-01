@@ -81,6 +81,17 @@ function conceptById(concepts: Concept[], id: string): Concept | undefined {
   return concepts.find((concept) => concept.id === id);
 }
 
+function clozeAnswer(card: Flashcard, concepts: Concept[]): string {
+  const fromBack = card.back.split("—")[0]?.trim() || card.back.trim();
+  const mentioned = card.conceptIds
+    .map((id) => conceptById(concepts, id))
+    .find((concept) => {
+      if (!concept) return false;
+      return fromBack.toLowerCase().includes(concept.term.toLowerCase());
+    });
+  return mentioned?.term ?? fromBack;
+}
+
 export function buildQuiz(cards: Flashcard[], concepts: Concept[], limit = 10): Question[] {
   if (cards.length === 0) return [];
 
@@ -123,7 +134,7 @@ export function buildQuiz(cards: Flashcard[], concepts: Concept[], limit = 10): 
     }
 
     if (card.type === "cloze") {
-      const blank = primary?.term ?? card.back.split("—")[0]?.trim() ?? card.back;
+      const blank = clozeAnswer(card, concepts);
       questions.push(
         mcq(
           card.front,
