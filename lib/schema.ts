@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { coerceOutlinePayload, extractJsonValue } from "@/lib/normalize-outline";
+import { coerceFlashcardsPayload } from "@/lib/normalize-flashcards";
 
 export const ImportanceSchema = z.enum(["core", "supporting"]);
 export type Importance = z.infer<typeof ImportanceSchema>;
@@ -77,7 +78,10 @@ export const QuestionSchema = z.object({
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const LlmSettingsSchema = z.object({
-  preset: z.enum(["groq", "ollama"]),
+  preset: z.enum(["groq", "openrouter", "deepseek", "ollama", "custom"]),
+  baseUrl: z.string().min(1),
+  model: z.string().min(1),
+  apiKey: z.string().default(""),
   temperature: z.number().min(0).max(2).default(0.2),
 });
 export type LlmSettings = z.infer<typeof LlmSettingsSchema>;
@@ -148,14 +152,7 @@ export function parseOutline(raw: unknown): Outline {
 }
 
 export function parseFlashcards(raw: unknown): Flashcard[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : typeof raw === "object" && raw && "cards" in raw
-      ? (raw as { cards: unknown }).cards
-      : null;
-  if (!Array.isArray(list)) {
-    throw new Error("The model did not return a flashcard list.");
-  }
+  const list = coerceFlashcardsPayload(raw);
   return z.array(FlashcardSchema).parse(list.map((card, i) => withId(card as Flashcard, "card", i)));
 }
 

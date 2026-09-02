@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,36 +20,49 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { testGroqFromClient, useGroqStatus } from "@/hooks/use-groq-status";
-import { PROVIDER_PRESETS, settingsFromPreset } from "@/lib/providers";
+import { canCallLlm, presetMeta, settingsFromPreset } from "@/lib/providers";
 import type { LlmSettings } from "@/lib/schema";
-import { CheckCircle2, Loader2, Settings2, XCircle } from "lucide-react";
+import { Loader2, Settings2 } from "lucide-react";
 
 type SettingsSheetProps = {
   settings: LlmSettings;
   onChange: (settings: LlmSettings) => void;
 };
 
+export async function testLlmFromClient(settings: LlmSettings) {
+  const response = await fetch("/api/llm/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings }),
+  });
+  return (await response.json()) as {
+    ok?: boolean;
+    model?: string;
+    reply?: string;
+    error?: string;
+    status?: number;
+  };
+}
+
 export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
-  const groqStatus = useGroqStatus();
+  const meta = presetMeta(settings);
+  const ready = canCallLlm(settings);
   const [testing, setTesting] = useState(false);
   const [testMessage, setTestMessage] = useState<string | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
 
-  const presetMeta = PROVIDER_PRESETS[settings.preset];
-
-  async function runGroqTest() {
+  async function runTest() {
     setTesting(true);
     setTestMessage(null);
     setTestOk(null);
-    const result = await testGroqFromClient();
+    const result = await testLlmFromClient(settings);
     setTesting(false);
-    setTestOk(result.ok);
+    setTestOk(Boolean(result.ok));
     if (result.ok) {
-      setTestMessage(`Groq replied: “${result.reply}” (${result.model})`);
+      setTestMessage(`Connected. Model replied: “${result.reply}” (${result.model})`);
       return;
     }
-    setTestMessage(result.error ?? "Groq test failed.");
+    setTestMessage(result.error ?? "Connection test failed.");
   }
 
   return (
@@ -61,8 +75,8 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
         <SheetHeader>
           <SheetTitle>Model settings</SheetTitle>
           <SheetDescription>
-            Groq credentials live in <code className="text-xs">.env.local</code> on the server. The
-            browser never sees your API key.
+            Your API key is saved only in this browser and sent to your local Next.js server when
+            you extract outlines. It is never committed to git.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-6">
@@ -79,53 +93,50 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="groq">Groq — Qwen3.8 27B</SelectItem>
-                <SelectItem value="ollama">Ollama — local Qwen2.5</SelectItem>
+                <SelectItem value="groq">Groq</SelectItem>
+                <SelectItem value="openrouter">OpenRouter</SelectItem>
+                <SelectItem value="deepseek">DeepSeek</SelectItem>
+                <SelectItem value="ollama">Ollama (local)</SelectItem>
+                <SelectItem value="custom">Custom endpoint</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs leading-relaxed text-muted-foreground">{presetMeta.hint}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{meta.hint}</p>
           </div>
 
-          {settings.preset === "groq" ? (
-            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-              <div className="flex items-center gap-2 font-medium">
-                {groqStatus.loading ? (
-                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                ) : groqStatus.configured ? (
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                ) : (
-                  <XCircle className="size-4 text-destructive" />
-                )}
-                {groqStatus.loading
-                  ? "Checking server…"
-                  : groqStatus.configured
-                    ? "GROQ_API_KEY is configured on the server"
-                    : "GROQ_API_KEY is missing on the server"}
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                Model: <span className="font-mono">{groqStatus.model}</span>
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                disabled={testing || groqStatus.loading}
-                onClick={() => void runGroqTest()}
-              >
-                {testing ? <Loader2 className="animate-spin" /> : null}
-                Test Groq connection
-              </Button>
-              {testMessage ? (
-                <Alert variant={testOk ? "default" : "destructive"} className="mt-3">
-                  <AlertTitle>{testOk ? "Groq OK" : "Groq API error"}</AlertTitle>
-                  <AlertDescription className="text-xs leading-relaxed">{testMessage}</AlertDescription>
-                </Alert>
-              ) : null}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="baseUrl">Base URL</Label>
+            <Input
+              id="baseUrl"
+              value={settings.baseUrl}
+              onChange={(event) => onChange({ ...settings, baseUrl: event.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="model">Model id</Label>
+            <Input
+              id="model"
+              value={settings.model}
+              onChange={(event) => onChange({ ...settings, model: event.target.value })}
+              placeholder="e.g. qwen/qwen3.8-27b"
+            />
+          </div>
+
+          {meta.needsKey ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="apiKey">API key</Label>
+              <Input
+                id="apiKey"
+                type="password"
+                autoComplete="off"
+                value={settings.apiKey}
+                onChange={(event) => onChange({ ...settings, apiKey: event.target.value })}
+                placeholder="Paste your key — stored locally only"
+              />
             </div>
           ) : (
-            <p className="rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-              Ollama model: <span className="font-mono">{presetMeta.model}</span>. Override with{" "}
-              <span className="font-mono">OLLAMA_MODEL</span> in <span className="font-mono">.env.local</span>.
+            <p className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+              No API key needed for local Ollama.
             </p>
           )}
 
@@ -143,10 +154,23 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
               }
               className="w-full accent-primary"
             />
-            <p className="text-xs text-muted-foreground">
-              Keep this low for outlines. 0.2 is a good default; raise it slightly if cards feel too stiff.
-            </p>
           </div>
+
+          <Button
+            variant="outline"
+            disabled={testing || !ready}
+            onClick={() => void runTest()}
+          >
+            {testing ? <Loader2 className="animate-spin" /> : null}
+            Test connection
+          </Button>
+
+          {testMessage ? (
+            <Alert variant={testOk ? "default" : "destructive"}>
+              <AlertTitle>{testOk ? "Connected" : "API error"}</AlertTitle>
+              <AlertDescription className="text-xs leading-relaxed">{testMessage}</AlertDescription>
+            </Alert>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

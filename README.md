@@ -2,75 +2,73 @@
 
 A local-first study companion for master’s lectures. Upload a text-based PDF, extract a structured English outline and concept list, keep the flashcards you actually want, then run a short retrieval quiz.
 
-The UI and all generated study material are in English on purpose: the point is to practise the same language as the lecture.
+Built to **share with classmates**: everyone uses their **own API key** in the app. Your key never goes into git.
 
 ## What it does
 
 1. **Upload** — drop lecture notes or slides (text PDFs; no OCR in this version).
-2. **Outline** — a hierarchical summary plus a concept table (term, definition, why it matters, related terms). You can edit definitions and tick what to learn.
-3. **Cards** — candidate memory cards of three types: term → definition, cloze, and contrast. You choose which to keep.
-4. **Quiz** — multiple-choice and short-recall items built from your deck, with a recap and retry-misses pass.
+2. **Outline** — hierarchical summary + concept table (term, definition, why it matters).
+3. **Cards** — term / cloze / contrast flashcard candidates; you pick what to keep.
+4. **Quiz** — multiple-choice and short-recall items with a recap and retry-misses pass.
 
-Sessions are cached in `localStorage` by PDF hash. There is no account and no database.
+Sessions are cached in `localStorage` by PDF hash. No account, no database.
 
-## Models
+## Supported providers
 
-| Provider | Where credentials live | Model |
+Any **OpenAI-compatible** chat API:
+
+| Preset | Default model | Get a key |
 | --- | --- | --- |
-| **Groq** (default) | `GROQ_API_KEY` in `.env.local` — **server only** | `qwen/qwen3.8-27b` |
-| **Ollama** (local) | No key; server talks to localhost | `qwen2.5:14b` (override with `OLLAMA_MODEL`) |
+| Groq | `qwen/qwen3.8-27b` | [console.groq.com](https://console.groq.com) |
+| OpenRouter | `qwen/qwen-2.5-72b-instruct` | [openrouter.ai](https://openrouter.ai) |
+| DeepSeek | `deepseek-chat` | [platform.deepseek.com](https://platform.deepseek.com) |
+| Ollama | `qwen2.5:14b` | No key (local) |
+| Custom | You choose | Together, Fireworks, LM Studio, … |
 
-Groq never uses `NEXT_PUBLIC_*` or browser `localStorage` for the API key. The client only knows whether the server has a key configured.
+Model ids are editable in **Model** settings. JSON from different models is normalized automatically — you should not need to change code when switching models.
 
-## Run locally
+## Quick start
 
 ```bash
-cp .env.example .env.local
-# edit .env.local and set GROQ_API_KEY=gsk_...
+git clone <your-repo-url>
+cd lecture-study-coach
 npm install
 npm run dev
 ```
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
-### Verify Groq
+1. Click **Model** → pick a provider → paste **your** API key → **Test connection**.
+2. Upload a lecture PDF → **Extract outline**.
 
-In the app: **Model → Test Groq connection**.
+Or skip keys entirely: **Load demo lecture** runs the full workflow on sample STA 621 notes.
 
-Or from a terminal (dev server must be running):
+## Sharing with classmates
 
-```bash
-curl -s http://127.0.0.1:43127/api/groq/test | jq
-curl -s http://127.0.0.1:43127/api/groq/status | jq
-```
+See **[SHARING.md](SHARING.md)** for a checklist before you send the repo or zip.
 
-Restart `npm run dev` after changing `.env.local`.
+**Never share** `.env.local` — that file may contain your personal API keys.
 
-### Ollama
+## Optional `.env.local`
 
-```bash
-ollama pull qwen2.5:14b
-ollama serve
-```
+Power users can put keys in `.env.local` instead of the UI (still gitignored). Copy `.env.example` as a template. The in-app key takes precedence when both are set.
 
-In **Model**, choose Ollama. No API key.
+## Test connection
 
-## Demo without Groq
+In the app: **Model → Test connection**.
 
-**Load demo lecture** walks the full loop on a STA 621 Bayesian inference / MLE lecture.
-
-**Extract bundled sample PDF** runs the real PDF parser on `public/sample-lecture.pdf`. Generating an outline from that file still needs Groq or Ollama.
-
-Regenerate the sample PDF:
+Or:
 
 ```bash
-npm run sample-pdf
+curl -s -X POST http://127.0.0.1:43127/api/llm/test \
+  -H 'Content-Type: application/json' \
+  -d '{"settings":{"preset":"groq","baseUrl":"https://api.groq.com/openai/v1","model":"qwen/qwen3.8-27b","apiKey":"YOUR_KEY","temperature":0.2}}'
 ```
 
 ## Stack
 
-Next.js, TypeScript, Tailwind, shadcn/ui, `pdfjs-dist` in the browser, Zod-validated JSON from the model via `app/api/llm/route.ts`, Groq via `app/api/groq/test/route.ts`.
+Next.js · TypeScript · Tailwind · shadcn/ui · pdfjs-dist · Zod · provider-agnostic JSON normalization
 
-## Note on hydration warnings
+## Hydration warning (Monica extension)
 
-If you see a React hydration warning mentioning `monica-id` or `monica-version`, that comes from the Monica browser extension injecting attributes into the DOM. It is not caused by this app.
+If you see `monica-id` / `monica-version` hydration warnings, that is from the Monica browser extension, not this app.

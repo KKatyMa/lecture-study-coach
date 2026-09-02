@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from "@/lib/providers";
 import { LlmSettingsSchema, type Flashcard, type LlmSettings, type Outline } from "@/lib/schema";
 
-const SETTINGS_KEY = "lsc.settings.v1";
+const SETTINGS_KEY = "lsc.settings.v2";
 const SESSION_INDEX_KEY = "lsc.sessions.v1";
 
 const settingsListeners = new Set<() => void>();
@@ -54,20 +54,38 @@ export type StoredSession = {
   updatedAt: number;
 };
 
+const VALID_PRESETS = new Set(["groq", "openrouter", "deepseek", "ollama", "custom"]);
+
 export function loadSettings(): LlmSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) {
+      return migrateLegacySettings();
+    }
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    // Drop legacy client-side fields (apiKey, baseUrl, model) from older builds.
-    const preset = parsed.preset === "ollama" ? "ollama" : "groq";
-    const temperature = parsed.temperature;
+    const preset = typeof parsed.preset === "string" && VALID_PRESETS.has(parsed.preset)
+      ? parsed.preset
+      : DEFAULT_SETTINGS.preset;
     return LlmSettingsSchema.parse({
       ...DEFAULT_SETTINGS,
+      ...parsed,
       preset,
-      ...(typeof temperature === "number" ? { temperature } : {}),
     });
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function migrateLegacySettings(): LlmSettings {
+  try {
+    const legacy = localStorage.getItem("lsc.settings.v1");
+    if (!legacy) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(legacy) as Record<string, unknown>;
+    const preset = parsed.preset === "ollama" ? "ollama" : "groq";
+    const next = LlmSettingsSchema.parse({ ...DEFAULT_SETTINGS, preset, temperature: parsed.temperature });
+    saveSettings(next);
+    return next;
   } catch {
     return DEFAULT_SETTINGS;
   }

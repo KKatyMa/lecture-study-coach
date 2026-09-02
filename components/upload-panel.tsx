@@ -10,7 +10,6 @@ import { FileText, FlaskConical, Loader2, Upload } from "lucide-react";
 
 type UploadPanelProps = {
   settings: LlmSettings;
-  groqConfigured: boolean;
   busy: boolean;
   error: string | null;
   extracted: ExtractedPdf | null;
@@ -21,7 +20,6 @@ type UploadPanelProps = {
 
 export function UploadPanel({
   settings,
-  groqConfigured,
   busy,
   error,
   extracted,
@@ -32,7 +30,7 @@ export function UploadPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const ready = canCallLlm(settings, groqConfigured);
+  const ready = canCallLlm(settings);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -116,12 +114,11 @@ export function UploadPanel({
 
           {!ready ? (
             <Alert>
-              <AlertTitle>Server model not ready</AlertTitle>
+              <AlertTitle>Add your model API key</AlertTitle>
               <AlertDescription>
-                Add <span className="font-mono">GROQ_API_KEY</span> to{" "}
-                <span className="font-mono">.env.local</span> and restart the dev server, or switch
-                to Ollama in Model. Until then you can still walk the full study loop with the demo
-                lecture.
+                Open <strong>Model</strong> in the header, choose a provider (Groq, OpenRouter,
+                DeepSeek, or local Ollama), and paste your key. Keys stay in your browser only. Or
+                use <strong>Load demo lecture</strong> without any key.
               </AlertDescription>
             </Alert>
           ) : null}
