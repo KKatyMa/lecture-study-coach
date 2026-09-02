@@ -38,6 +38,25 @@ npm run dev
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
+### Phone or tablet (same Wi‑Fi)
+
+The UI is responsive, but `npm run dev` only listens on this computer. To open it on iPad / Android:
+
+```bash
+npm run dev:lan
+```
+
+1. Find your computer’s LAN IP (e.g. `192.168.1.23` on macOS: System Settings → Network).
+2. On phone/tablet (same Wi‑Fi), open `http://192.168.1.23:43127` in Safari or Chrome.
+3. Set up **Model** and your API key on that device (keys are stored per browser).
+
+**Tips**
+
+- Upload PDFs via **Files** / **Browse** — drag-and-drop is desktop-only.
+- Use **Load demo lecture** if you only want to try cards and quiz on mobile.
+- iOS may block very large PDF uploads; shorter lecture notes work best.
+- For classmates off-campus, deploy to Vercel/Railway or use a VPN to your LAN — see [SHARING.md](SHARING.md).
+
 1. Click **Model** → pick a provider → paste **your** API key → **Test connection**.
 2. Upload a lecture PDF → **Extract outline**.
 

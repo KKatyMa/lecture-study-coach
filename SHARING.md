@@ -47,6 +47,10 @@ The app normalizes different JSON shapes (nested `outline`, snake_case fields, e
 
 **Load demo lecture** — full outline → cards → quiz on STA 621 Bayesian inference notes.
 
+## Phone / tablet
+
+Same app, responsive layout. Run `npm run dev:lan`, then on your device (same Wi‑Fi) open `http://<your-computer-ip>:43127`. Each device keeps its own API key in the browser. PDF upload uses the file picker, not drag-and-drop.
+
 ## Troubleshooting
 
 | Problem | Fix |
