@@ -34,8 +34,9 @@ export function subscribeSettings(listener: () => void): () => void {
 }
 
 export function writeSettings(settings: LlmSettings): void {
-  saveSettings(settings);
-  cachedSettings = settings;
+  const persisted = settings.preset === "groq" ? { ...settings, apiKey: "" } : settings;
+  saveSettings(persisted);
+  cachedSettings = persisted;
   cachedSettingsRaw = typeof window === "undefined" ? null : localStorage.getItem(SETTINGS_KEY);
   emitSettings();
 }
@@ -67,11 +68,15 @@ export function loadSettings(): LlmSettings {
     const preset = typeof parsed.preset === "string" && VALID_PRESETS.has(parsed.preset)
       ? parsed.preset
       : DEFAULT_SETTINGS.preset;
-    return LlmSettingsSchema.parse({
+    const merged = LlmSettingsSchema.parse({
       ...DEFAULT_SETTINGS,
       ...parsed,
       preset,
     });
+    if (merged.preset === "groq") {
+      return { ...merged, apiKey: "" };
+    }
+    return merged;
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -92,6 +97,11 @@ function migrateLegacySettings(): LlmSettings {
 }
 
 export function saveSettings(settings: LlmSettings): void {
+  if (settings.preset === "groq") {
+    const { apiKey: _apiKey, ...persisted } = settings;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(persisted));
+    return;
+  }
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 

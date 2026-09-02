@@ -1,5 +1,5 @@
-import { StudyApp } from "@/components/study-app";
+import { ApiKeyGate } from "@/components/api-key-gate";
 
 export default function Home() {
-  return <StudyApp />;
+  return <ApiKeyGate />;
 }

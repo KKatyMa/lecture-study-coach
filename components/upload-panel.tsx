@@ -10,6 +10,8 @@ import { FileText, FlaskConical, Loader2, Upload } from "lucide-react";
 
 type UploadPanelProps = {
   settings: LlmSettings;
+  groqApiKey?: string | null;
+  demoOnly?: boolean;
   busy: boolean;
   error: string | null;
   extracted: ExtractedPdf | null;
@@ -20,6 +22,8 @@ type UploadPanelProps = {
 
 export function UploadPanel({
   settings,
+  groqApiKey = null,
+  demoOnly = false,
   busy,
   error,
   extracted,
@@ -30,7 +34,7 @@ export function UploadPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const ready = canCallLlm(settings);
+  const ready = canCallLlm(settings, groqApiKey);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -114,11 +118,19 @@ export function UploadPanel({
 
           {!ready ? (
             <Alert>
-              <AlertTitle>Add your model API key</AlertTitle>
+              <AlertTitle>{demoOnly ? "Demo mode — no Groq key" : "Groq API key required"}</AlertTitle>
               <AlertDescription>
-                Open <strong>Model</strong> in the header, choose a provider (Groq, OpenRouter,
-                DeepSeek, or local Ollama), and paste your key. Keys stay in your browser only. Or
-                use <strong>Load demo lecture</strong> without any key.
+                {demoOnly ? (
+                  <>
+                    You opened the demo without a key. Upload your own PDF after entering a Groq key
+                    on the welcome screen.
+                  </>
+                ) : (
+                  <>
+                    Enter your Groq API key on the welcome screen before extracting outlines. Or use{" "}
+                    <strong>Load demo lecture</strong> below without any key.
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           ) : null}

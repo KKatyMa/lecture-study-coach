@@ -9,21 +9,21 @@ A study companion for master’s lectures. Upload a text-based PDF, get an Engli
 3. **Cards** — term, cloze, and contrast cards; you choose what to keep.
 4. **Quiz** — multiple-choice and short recall, with a recap for misses.
 
-Progress is saved in your browser (`localStorage`). No account, no database.
+Study progress is saved in your browser (`localStorage`). Groq API keys stay in `sessionStorage` for the current tab only — never on the server.
 
-## Models
+## Groq API key (BYOK)
 
-Works with any **OpenAI-compatible** API. Open **Model** in the app, pick a provider, paste your key, and edit the model id if needed.
+1. Open the app — you’ll see a **Groq API key** screen first.
+2. Paste your key from [console.groq.com](https://console.groq.com/keys).
+3. The app verifies it with Groq, then stores it in **sessionStorage** only.
+4. Each outline/cards request sends your key from the browser to this app’s API, which forwards it to Groq for that request only.
+5. Use **Log out / Forget API key** in the header to clear the key from this session.
 
-| Preset | Default model |
-| --- | --- |
-| Groq | `qwen/qwen3.8-27b` |
-| OpenRouter | `qwen/qwen-2.5-72b-instruct` |
-| DeepSeek | `deepseek-chat` |
-| Ollama | `qwen2.5:14b` (local, no key) |
-| Custom | your endpoint |
+No key? Click **Load demo lecture (no key)** on the welcome screen to try the full workflow on sample STA 621 notes.
 
-Different models return JSON in different shapes — the app normalizes that for you.
+Default model: `qwen/qwen3.8-27b`. Override with `GROQ_MODEL` in `.env.local` (not secret) or change the model id under **Model** in the app.
+
+Other OpenAI-compatible providers (OpenRouter, DeepSeek, Ollama) are still available under **Model** — their keys are entered in that drawer (Groq keys are not stored there).
 
 ## Run locally
 
@@ -34,10 +34,8 @@ npm run dev
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
-1. **Model** → choose provider → paste API key → **Test connection**
+1. Enter your Groq API key on the welcome screen
 2. Upload a PDF → **Extract outline**
-
-No key? Use **Load demo lecture** to try the full flow on sample STA 621 notes.
 
 ## Stack
 

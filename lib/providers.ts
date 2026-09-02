@@ -46,10 +46,14 @@ export const PROVIDER_PRESETS: Record<Exclude<ProviderPreset, "custom">, Provide
   },
 };
 
+export function defaultGroqModel(): string {
+  return PROVIDER_PRESETS.groq.model;
+}
+
 export const DEFAULT_SETTINGS: LlmSettings = {
   preset: "groq",
   baseUrl: PROVIDER_PRESETS.groq.baseUrl,
-  model: PROVIDER_PRESETS.groq.model,
+  model: defaultGroqModel(),
   apiKey: "",
   temperature: 0.2,
 };
@@ -75,9 +79,10 @@ export function isLocalBaseUrl(baseUrl: string): boolean {
   return url.includes("localhost") || url.includes("127.0.0.1") || url.includes("0.0.0.0");
 }
 
-export function canCallLlm(settings: LlmSettings): boolean {
+export function canCallLlm(settings: LlmSettings, groqApiKey?: string | null): boolean {
   if (!settings.baseUrl.trim() || !settings.model.trim()) return false;
   if (settings.preset === "ollama" || isLocalBaseUrl(settings.baseUrl)) return true;
+  if (settings.preset === "groq") return Boolean(groqApiKey?.trim());
   return settings.apiKey.trim().length > 0;
 }
 

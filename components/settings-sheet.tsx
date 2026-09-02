@@ -26,14 +26,19 @@ import { Loader2, Settings2 } from "lucide-react";
 
 type SettingsSheetProps = {
   settings: LlmSettings;
+  groqApiKey?: string | null;
   onChange: (settings: LlmSettings) => void;
 };
 
-export async function testLlmFromClient(settings: LlmSettings) {
+export async function testLlmFromClient(settings: LlmSettings, groqApiKey?: string | null) {
+  const effectiveSettings =
+    settings.preset === "groq"
+      ? { ...settings, apiKey: groqApiKey ?? "" }
+      : settings;
   const response = await fetch("/api/llm/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ settings }),
+    body: JSON.stringify({ settings: effectiveSettings }),
   });
   return (await response.json()) as {
     ok?: boolean;
@@ -44,9 +49,12 @@ export async function testLlmFromClient(settings: LlmSettings) {
   };
 }
 
-export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
+export function SettingsSheet({ settings, groqApiKey = null, onChange }: SettingsSheetProps) {
   const meta = presetMeta(settings);
-  const ready = canCallLlm(settings);
+  const ready = canCallLlm(
+    settings.preset === "groq" ? { ...settings, apiKey: groqApiKey ?? "" } : settings,
+    groqApiKey,
+  );
   const [testing, setTesting] = useState(false);
   const [testMessage, setTestMessage] = useState<string | null>(null);
   const [testOk, setTestOk] = useState<boolean | null>(null);
@@ -55,7 +63,7 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
     setTesting(true);
     setTestMessage(null);
     setTestOk(null);
-    const result = await testLlmFromClient(settings);
+    const result = await testLlmFromClient(settings, groqApiKey);
     setTesting(false);
     setTestOk(Boolean(result.ok));
     if (result.ok) {
@@ -75,8 +83,8 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
         <SheetHeader>
           <SheetTitle>Model settings</SheetTitle>
           <SheetDescription>
-            Your API key is saved only in this browser and sent to your local Next.js server when
-            you extract outlines. It is never committed to git.
+            Model and temperature are saved in this browser. Groq API keys live in sessionStorage
+            only — use Log out in the header to clear yours.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-6">
@@ -122,7 +130,15 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
             />
           </div>
 
-          {meta.needsKey ? (
+          {meta.needsKey && settings.preset === "groq" ? (
+            <p className="rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              Your Groq API key is stored in this browser session only. It was set on the welcome
+              screen and is sent with each model request. Use{" "}
+              <strong>Log out / Forget API key</strong> in the header to clear it.
+            </p>
+          ) : null}
+
+          {meta.needsKey && settings.preset !== "groq" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="apiKey">API key</Label>
               <Input

@@ -12,10 +12,12 @@ export type ResolvedLlmConfig = {
   supportsJsonMode: boolean;
 };
 
+export function defaultGroqModel(): string {
+  return process.env.GROQ_MODEL?.trim() || "qwen/qwen3.8-27b";
+}
+
 function envFallbackKey(preset: LlmSettings["preset"]): string | undefined {
   switch (preset) {
-    case "groq":
-      return process.env.GROQ_API_KEY?.trim();
     case "openrouter":
       return process.env.OPENROUTER_API_KEY?.trim();
     case "deepseek":
@@ -25,15 +27,73 @@ function envFallbackKey(preset: LlmSettings["preset"]): string | undefined {
   }
 }
 
+export async function validateGroqApiKey(apiKey: string): Promise<{
+  ok: boolean;
+  error?: string;
+  status?: number;
+}> {
+  const key = apiKey.trim();
+  if (!key) {
+    return { ok: false, error: "Please enter your Groq API key.", status: 400 };
+  }
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+      },
+    });
+
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    let detail = "That Groq API key looks invalid or expired.";
+    try {
+      const payload = (await response.json()) as { error?: { message?: string } | string };
+      if (typeof payload.error === "string") detail = payload.error;
+      if (typeof payload.error === "object" && payload.error?.message) detail = payload.error.message;
+    } catch {
+      /* keep friendly default */
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      detail =
+        "That Groq API key was rejected. Double-check the key from console.groq.com and try again.";
+    }
+
+    return { ok: false, error: detail, status: response.status };
+  } catch {
+    return {
+      ok: false,
+      error: "Could not reach Groq to verify your key. Check your connection and try again.",
+      status: 503,
+    };
+  }
+}
+
 export function resolveLlmConfig(settings: LlmSettings): ResolvedLlmConfig {
   const meta = presetMeta(settings);
   const baseUrl = settings.baseUrl.trim() || meta.baseUrl;
-  const model = settings.model.trim() || meta.model;
+  const model =
+    settings.preset === "groq"
+      ? settings.model.trim() || defaultGroqModel()
+      : settings.model.trim() || meta.model;
   const local = isLocalBaseUrl(baseUrl);
 
-  let apiKey = settings.apiKey.trim() || envFallbackKey(settings.preset) || "";
-  if (local) {
-    apiKey = apiKey || "ollama";
+  let apiKey = settings.apiKey.trim();
+  if (settings.preset === "groq") {
+    if (!apiKey) {
+      throw new Error(
+        "No Groq API key in this session. Enter your key on the welcome screen or use the demo lecture.",
+      );
+    }
+  } else {
+    apiKey = apiKey || envFallbackKey(settings.preset) || "";
+    if (local) {
+      apiKey = apiKey || "ollama";
+    }
   }
 
   if (!local && !apiKey) {

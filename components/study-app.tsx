@@ -24,7 +24,13 @@ import {
   subscribeSettings,
   writeSettings,
 } from "@/lib/storage";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { GraduationCap, Loader2, LogOut } from "lucide-react";
+
+type StudyAppProps = {
+  groqApiKey?: string | null;
+  demoOnly?: boolean;
+  onForgetGroqKey?: () => void;
+};
 
 type SessionState = {
   fileName: string;
@@ -69,11 +75,18 @@ function persist(session: SessionState) {
   });
 }
 
-export function StudyApp() {
+export function StudyApp({ groqApiKey = null, demoOnly = false, onForgetGroqKey }: StudyAppProps) {
   const settings = useSyncExternalStore(
     subscribeSettings,
     getSettingsSnapshot,
     getServerSettingsSnapshot,
+  );
+  const effectiveSettings = useMemo(
+    () => ({
+      ...settings,
+      apiKey: settings.preset === "groq" ? (groqApiKey ?? "") : settings.apiKey,
+    }),
+    [settings, groqApiKey],
   );
   const [step, setStep] = useState<StepId>("upload");
   const [session, setSession] = useState<SessionState>(EMPTY_SESSION);
@@ -88,7 +101,7 @@ export function StudyApp() {
     persist(session);
   }, [session]);
 
-  const llmReady = canCallLlm(settings);
+  const llmReady = canCallLlm(effectiveSettings, groqApiKey);
 
   const enabled = useMemo(
     () => ({
@@ -166,7 +179,7 @@ export function StudyApp() {
   async function analyzePdf() {
     if (!session.extracted) return;
     if (!llmReady) {
-      setError("Open Model, paste your API key, or load the demo lecture.");
+      setError("Enter your Groq API key on the welcome screen, or load the demo lecture.");
       return;
     }
     setBusy(true);
@@ -175,7 +188,7 @@ export function StudyApp() {
     try {
       const chunks = chunkPages(session.extracted.pages);
       const outline = await requestOutline({
-        settings,
+        settings: effectiveSettings,
         fileName: session.fileName,
         chunks,
         onProgress: setProgress,
@@ -227,7 +240,7 @@ export function StudyApp() {
     }
 
     if (!llmReady) {
-      setError("Open Model and paste your API key, or use the demo lecture.");
+      setError("Enter your Groq API key on the welcome screen, or use the demo lecture.");
       return;
     }
 
@@ -236,7 +249,7 @@ export function StudyApp() {
     setProgress("Drafting term, cloze, and contrast cards…");
     try {
       const cards = await requestCards({
-        settings: { ...settings, temperature: Math.min(0.5, settings.temperature + 0.2) },
+        settings: { ...effectiveSettings, temperature: Math.min(0.5, effectiveSettings.temperature + 0.2) },
         title: session.outline.title,
         concepts: selected,
       });
@@ -290,7 +303,15 @@ export function StudyApp() {
                 </p>
               </div>
             </div>
-            <SettingsSheet settings={settings} onChange={applySettings} />
+            <div className="flex flex-wrap items-center gap-2">
+              {onForgetGroqKey ? (
+                <Button variant="ghost" size="sm" onClick={onForgetGroqKey}>
+                  <LogOut />
+                  Log out / Forget API key
+                </Button>
+              ) : null}
+              <SettingsSheet settings={settings} groqApiKey={groqApiKey} onChange={applySettings} />
+            </div>
           </div>
           <StepNav
             current={step}
@@ -321,7 +342,7 @@ export function StudyApp() {
             <AlertDescription className="flex flex-col gap-2">
               <span>{error}</span>
               <span>
-                Check your provider, model id, and API key in Model settings. You can still use the demo lecture.
+                Check your Groq key and model id in Model settings. You can still use the demo lecture.
               </span>
               <div>
                 <Button size="sm" variant="outline" onClick={loadDemo}>
@@ -334,7 +355,9 @@ export function StudyApp() {
 
         {step === "upload" ? (
           <UploadPanel
-            settings={settings}
+            settings={effectiveSettings}
+            groqApiKey={groqApiKey}
+            demoOnly={demoOnly}
             busy={busy}
             error={error}
             extracted={session.extracted}
