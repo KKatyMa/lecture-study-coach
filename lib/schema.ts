@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { coerceOutlinePayload, extractJsonValue } from "@/lib/normalize-outline";
 
 export const ImportanceSchema = z.enum(["core", "supporting"]);
 export type Importance = z.infer<typeof ImportanceSchema>;
@@ -98,15 +99,20 @@ export const ExtractedPdfSchema = z.object({
 export type ExtractedPdf = z.infer<typeof ExtractedPdfSchema>;
 
 export function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1].trim() : trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("The model did not return a JSON object.");
+  return extractJsonValue(raw);
+}
+
+export function formatSchemaError(error: z.ZodError): string {
+  const missing = error.issues
+    .filter((issue) => issue.code === "invalid_type")
+    .map((issue) => issue.path.join("."))
+    .filter(Boolean);
+
+  if (missing.length >= 2) {
+    return `The model JSON was missing required fields (${missing.slice(0, 4).join(", ")}${missing.length > 4 ? ", …" : ""}). Try Extract outline again.`;
   }
-  return JSON.parse(candidate.slice(start, end + 1));
+
+  return error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
 }
 
 function withId<T extends { id?: string }>(item: T, prefix: string, index: number): T & { id: string } {
@@ -129,11 +135,15 @@ function normalizeSection(section: OutlineSection, index: number, prefix: string
 }
 
 export function parseOutline(raw: unknown): Outline {
-  const parsed = OutlineSchema.parse(raw);
+  const coerced = coerceOutlinePayload(raw);
+  const parsed = OutlineSchema.safeParse(coerced);
+  if (!parsed.success) {
+    throw new Error(formatSchemaError(parsed.error));
+  }
   return {
-    ...parsed,
-    sections: parsed.sections.map((section, i) => normalizeSection(section, i, "sec")),
-    concepts: parsed.concepts.map((concept, i) => withId(concept, "concept", i)),
+    ...parsed.data,
+    sections: parsed.data.sections.map((section, i) => normalizeSection(section, i, "sec")),
+    concepts: parsed.data.concepts.map((concept, i) => withId(concept, "concept", i)),
   };
 }
 

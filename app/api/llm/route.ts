@@ -8,6 +8,7 @@ import {
   SYSTEM_PROMPT,
 } from "@/lib/prompts";
 import { resolveServerLlmConfig } from "@/lib/server-llm";
+import { coerceOutlinePayload } from "@/lib/normalize-outline";
 import { LlmSettingsSchema, extractJsonObject } from "@/lib/schema";
 
 export const maxDuration = 120;
@@ -93,18 +94,39 @@ async function callChat(
 
 function readContent(raw: string): string {
   const parsed = JSON.parse(raw) as {
-    choices?: { message?: { content?: string | Array<{ text?: string; type?: string }> } }[];
+    choices?: {
+      message?: {
+        content?: string | Array<{ text?: string; type?: string }> | null;
+        reasoning?: string | null;
+      };
+    }[];
     error?: { message?: string };
   };
   if (parsed.error?.message) {
     throw new Error(parsed.error.message);
   }
-  const content = parsed.choices?.[0]?.message?.content;
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content.map((part) => part.text ?? "").join("");
+
+  const message = parsed.choices?.[0]?.message;
+  if (!message) {
+    throw new Error("The model response did not include a message.");
   }
-  throw new Error("The model response did not include message content.");
+
+  let content = "";
+  if (typeof message.content === "string") {
+    content = message.content;
+  } else if (Array.isArray(message.content)) {
+    content = message.content.map((part) => part.text ?? "").join("");
+  }
+
+  content = content.trim();
+  if (!content && typeof message.reasoning === "string" && message.reasoning.trim()) {
+    content = message.reasoning.trim();
+  }
+
+  if (!content) {
+    throw new Error("The model response did not include message content.");
+  }
+  return content;
 }
 
 export async function POST(request: Request) {
@@ -138,7 +160,12 @@ export async function POST(request: Request) {
     }
 
     const content = readContent(result.text);
-    const data = extractJsonObject(content);
+    let data = extractJsonObject(content);
+
+    if (body.action === "outline" || body.action === "outline-map" || body.action === "outline-reduce") {
+      data = coerceOutlinePayload(data);
+    }
+
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error.";

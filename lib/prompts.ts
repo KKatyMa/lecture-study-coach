@@ -7,12 +7,13 @@ Rules:
 - Prefer the lecturer's terminology. Keep standard mathematical names (e.g. "posterior", "MLE").
 - Be concise, exam-ready, and conceptually sharp.
 - If the excerpt is incomplete, extract what is present and note gaps in bullets rather than guessing.
-- Return JSON only. No markdown, no commentary.`;
+- Return JSON only. No markdown fences, no commentary, no wrapper keys.
+- For outlines, the top-level JSON object MUST use exactly these keys: title, summary, sections, concepts.`;
 
 export function outlinePrompt(lectureText: string, fileName: string): string {
   return `Read this master's lecture excerpt from "${fileName}" and build a study outline.
 
-Return a JSON object with this exact shape:
+Return a JSON object with this exact top-level shape (do not nest under "outline" or any other key):
 {
   "title": "string — lecture title if present, else a precise inferred title",
   "summary": "5 to 8 sentences covering the argument of the lecture",
@@ -59,7 +60,8 @@ ${lectureText}
 
 export function outlineMapPrompt(lectureText: string, fileName: string, chunkIndex: number, chunkCount: number): string {
   return `This is chunk ${chunkIndex + 1} of ${chunkCount} from "${fileName}".
-Extract a PARTIAL outline and concepts from this chunk only. Same JSON schema as a full outline.
+Extract a PARTIAL outline and concepts from this chunk only.
+Return JSON with top-level keys exactly: title, summary, sections, concepts (same schema as a full outline).
 Use ids prefixed with "c${chunkIndex + 1}-". Do not summarize missing chunks.
 
 Chunk text:
@@ -72,7 +74,7 @@ export function outlineReducePrompt(partialsJson: string, fileName: string): str
   return `Merge these partial lecture outlines from "${fileName}" into ONE coherent outline.
 Deduplicate concepts that refer to the same idea (keep the sharper definition).
 Preserve sourceHint when possible. Rebuild a clean section hierarchy.
-Return the same JSON schema as a full outline.
+Return JSON with top-level keys exactly: title, summary, sections, concepts.
 
 Partial outlines:
 ${partialsJson}`;
