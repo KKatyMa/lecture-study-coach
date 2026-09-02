@@ -89,7 +89,7 @@ export function UploadPanel({
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf"
+            accept="application/pdf,.pdf"
             className="hidden"
             onChange={(event) => {
               void handleFile(event.target.files?.[0]);

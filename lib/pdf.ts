@@ -1,7 +1,61 @@
 import type { ExtractedPdf, PdfPage } from "@/lib/schema";
+import { ensurePdfPolyfills } from "@/lib/pdf-polyfills";
 
 const TARGET_CHUNK_CHARS = 12000;
 const MIN_TEXT_CHARS = 200;
+
+const WORKER_POLYFILL = `
+if (typeof Promise.withResolvers !== "function") {
+  Promise.withResolvers = function withResolvers() {
+    var resolve, reject;
+    var promise = new Promise(function (res, rej) {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise: promise, resolve: resolve, reject: reject };
+  };
+}
+if (typeof Promise.try !== "function") {
+  Promise.try = function tryPromise(callback) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      try {
+        Promise.resolve(callback.apply(null, args)).then(resolve, reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+}
+`;
+
+let cachedWorkerPort: Worker | null = null;
+
+async function configurePdfWorker(GlobalWorkerOptions: {
+  workerSrc: string;
+  workerPort: Worker | null;
+}): Promise<void> {
+  if (cachedWorkerPort) {
+    GlobalWorkerOptions.workerPort = cachedWorkerPort;
+    return;
+  }
+
+  try {
+    const response = await fetch(`${window.location.origin}/pdf.worker.min.mjs`, { cache: "force-cache" });
+    if (!response.ok) {
+      GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
+      return;
+    }
+
+    const workerCode = await response.text();
+    const blob = new Blob([WORKER_POLYFILL, workerCode], { type: "text/javascript" });
+    const url = URL.createObjectURL(blob);
+    cachedWorkerPort = new Worker(url, { type: "module" });
+    GlobalWorkerOptions.workerPort = cachedWorkerPort;
+  } catch {
+    GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
+  }
+}
 
 export function estimateTokens(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -12,11 +66,32 @@ export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function fallbackHashArrayBuffer(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let hash = 0x811c9dc5;
+  const step = Math.max(1, Math.floor(bytes.length / 65536));
+
+  for (let index = 0; index < bytes.length; index += step) {
+    hash ^= bytes[index];
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return `fnv-${(hash >>> 0).toString(16)}-${bytes.length.toString(16)}`;
+}
+
 export async function hashArrayBuffer(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  if (typeof crypto !== "undefined" && crypto.subtle?.digest) {
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", buffer);
+      return Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    } catch {
+      /* fall through to non-crypto hash on insecure contexts (e.g. mobile over HTTP LAN) */
+    }
+  }
+
+  return fallbackHashArrayBuffer(buffer);
 }
 
 export async function extractPdf(file: File): Promise<ExtractedPdf> {
@@ -24,13 +99,15 @@ export async function extractPdf(file: File): Promise<ExtractedPdf> {
     throw new Error("PDF extraction runs in the browser.");
   }
 
+  ensurePdfPolyfills();
+
   const buffer = await file.arrayBuffer();
   const fileHash = await hashArrayBuffer(buffer);
 
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+  const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  await configurePdfWorker(GlobalWorkerOptions);
 
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
+  const loadingTask = getDocument({ data: new Uint8Array(buffer) });
   const doc = await loadingTask.promise;
   const pages: PdfPage[] = [];
 
@@ -38,7 +115,7 @@ export async function extractPdf(file: File): Promise<ExtractedPdf> {
     const page = await doc.getPage(pageNumber);
     const content = await page.getTextContent();
     const text = content.items
-      .map((item) => ("str" in item ? item.str : ""))
+      .map((item: { str?: string }) => item.str ?? "")
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
