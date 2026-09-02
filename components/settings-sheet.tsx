@@ -79,7 +79,7 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="groq">Groq — Llama 3.3 70B</SelectItem>
+                <SelectItem value="groq">Groq — Qwen3.8 27B</SelectItem>
                 <SelectItem value="ollama">Ollama — local Qwen2.5</SelectItem>
               </SelectContent>
             </Select>

@@ -11,7 +11,7 @@ type GroqStatus = {
 export function useGroqStatus(): GroqStatus {
   const [status, setStatus] = useState<GroqStatus>({
     configured: false,
-    model: "llama-3.3-70b-versatile",
+    model: "qwen/qwen3.8-27b",
     loading: true,
   });
 

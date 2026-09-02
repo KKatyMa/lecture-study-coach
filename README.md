@@ -17,7 +17,7 @@ Sessions are cached in `localStorage` by PDF hash. There is no account and no da
 
 | Provider | Where credentials live | Model |
 | --- | --- | --- |
-| **Groq** (default) | `GROQ_API_KEY` in `.env.local` — **server only** | `llama-3.3-70b-versatile` |
+| **Groq** (default) | `GROQ_API_KEY` in `.env.local` — **server only** | `qwen/qwen3.8-27b` |
 | **Ollama** (local) | No key; server talks to localhost | `qwen2.5:14b` (override with `OLLAMA_MODEL`) |
 
 Groq never uses `NEXT_PUBLIC_*` or browser `localStorage` for the API key. The client only knows whether the server has a key configured.

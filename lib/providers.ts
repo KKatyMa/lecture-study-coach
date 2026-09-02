@@ -7,8 +7,8 @@ export const PROVIDER_PRESETS: Record<
   { label: string; model: string; hint: string }
 > = {
   groq: {
-    label: "Groq — Llama 3.3 70B",
-    model: "llama-3.3-70b-versatile",
+    label: "Groq — Qwen3.8 27B",
+    model: "qwen/qwen3.8-27b",
     hint: "Groq runs on the server using GROQ_API_KEY from .env.local. The key is never sent to the browser.",
   },
   ollama: {

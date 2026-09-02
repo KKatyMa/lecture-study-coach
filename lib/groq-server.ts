@@ -1,7 +1,7 @@
 /** Server-only Groq configuration. Never import this module from client components. */
 
 export const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
-export const GROQ_MODEL = "llama-3.3-70b-versatile";
+export const GROQ_MODEL = "qwen/qwen3.8-27b";
 
 export function getGroqApiKey(): string | undefined {
   return process.env.GROQ_API_KEY?.trim() || undefined;
