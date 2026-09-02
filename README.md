@@ -50,17 +50,21 @@ npm run dev:lan
 2. On phone/tablet (same Wi‑Fi), open `http://192.168.1.23:43127` in Safari or Chrome.
 3. Set up **Model** and your API key on that device (keys are stored per browser).
 
+1. Click **Model** → pick a provider → paste **your** API key → **Test connection**.
+2. Upload a lecture PDF → **Extract outline**.
+
+Or skip keys entirely: **Load demo lecture** runs the full workflow on sample STA 621 notes.
+
 **Tips**
 
 - Upload PDFs via **Files** / **Browse** — drag-and-drop is desktop-only.
 - Use **Load demo lecture** if you only want to try cards and quiz on mobile.
 - iOS may block very large PDF uploads; shorter lecture notes work best.
-- For classmates off-campus, deploy to Vercel/Railway or use a VPN to your LAN — see [SHARING.md](SHARING.md).
+- For classmates off-campus, deploy to the public internet — see **[DEPLOY.md](DEPLOY.md)** (Vercel / Railway / Docker).
 
-1. Click **Model** → pick a provider → paste **your** API key → **Test connection**.
-2. Upload a lecture PDF → **Extract outline**.
+## Deploy to the public internet
 
-Or skip keys entirely: **Load demo lecture** runs the full workflow on sample STA 621 notes.
+See **[DEPLOY.md](DEPLOY.md)** for step-by-step guides (Vercel, Railway, Render, Docker). No database or shared API key required — classmates paste their own keys in **Model**.
 
 ## Sharing with classmates
 

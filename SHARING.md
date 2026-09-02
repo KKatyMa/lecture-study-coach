@@ -62,4 +62,12 @@ Same app, responsive layout. Run `npm run dev:lan`, then on your device (same Wi
 
 ## Deploying (optional)
 
-If you deploy to Vercel/Railway, each user should still use **their own key in the browser** unless you run a private instance with server env vars. Do not expose a shared key in `NEXT_PUBLIC_*` variables.
+Full guide: **[DEPLOY.md](DEPLOY.md)** (中文). Quick options:
+
+| Platform | Best for |
+| --- | --- |
+| [Vercel](https://vercel.com) | Fastest public URL; watch serverless timeouts on long PDFs |
+| [Railway](https://railway.app) | Longer LLM requests, `npm run start` |
+| Docker / VPS | Full control, HTTPS via Nginx |
+
+Each user still pastes their own API key in the browser. Do not expose a shared key in `NEXT_PUBLIC_*` variables.
