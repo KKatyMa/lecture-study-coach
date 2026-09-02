@@ -4,59 +4,6 @@ import { ensurePdfPolyfills } from "@/lib/pdf-polyfills";
 const TARGET_CHUNK_CHARS = 12000;
 const MIN_TEXT_CHARS = 200;
 
-const WORKER_POLYFILL = `
-if (typeof Promise.withResolvers !== "function") {
-  Promise.withResolvers = function withResolvers() {
-    var resolve, reject;
-    var promise = new Promise(function (res, rej) {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise: promise, resolve: resolve, reject: reject };
-  };
-}
-if (typeof Promise.try !== "function") {
-  Promise.try = function tryPromise(callback) {
-    var args = Array.prototype.slice.call(arguments, 1);
-    return new Promise(function (resolve, reject) {
-      try {
-        Promise.resolve(callback.apply(null, args)).then(resolve, reject);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  };
-}
-`;
-
-let cachedWorkerPort: Worker | null = null;
-
-async function configurePdfWorker(GlobalWorkerOptions: {
-  workerSrc: string;
-  workerPort: Worker | null;
-}): Promise<void> {
-  if (cachedWorkerPort) {
-    GlobalWorkerOptions.workerPort = cachedWorkerPort;
-    return;
-  }
-
-  try {
-    const response = await fetch(`${window.location.origin}/pdf.worker.min.mjs`, { cache: "force-cache" });
-    if (!response.ok) {
-      GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
-      return;
-    }
-
-    const workerCode = await response.text();
-    const blob = new Blob([WORKER_POLYFILL, workerCode], { type: "text/javascript" });
-    const url = URL.createObjectURL(blob);
-    cachedWorkerPort = new Worker(url, { type: "module" });
-    GlobalWorkerOptions.workerPort = cachedWorkerPort;
-  } catch {
-    GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
-  }
-}
-
 export function estimateTokens(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.ceil(words * 1.3);
@@ -94,6 +41,10 @@ export async function hashArrayBuffer(buffer: ArrayBuffer): Promise<string> {
   return fallbackHashArrayBuffer(buffer);
 }
 
+function configurePdfWorker(GlobalWorkerOptions: { workerSrc: string }): void {
+  GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
+}
+
 export async function extractPdf(file: File): Promise<ExtractedPdf> {
   if (typeof window === "undefined") {
     throw new Error("PDF extraction runs in the browser.");
@@ -105,7 +56,7 @@ export async function extractPdf(file: File): Promise<ExtractedPdf> {
   const fileHash = await hashArrayBuffer(buffer);
 
   const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  await configurePdfWorker(GlobalWorkerOptions);
+  configurePdfWorker(GlobalWorkerOptions);
 
   const loadingTask = getDocument({ data: new Uint8Array(buffer) });
   const doc = await loadingTask.promise;

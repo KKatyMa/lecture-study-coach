@@ -48,7 +48,8 @@ export function UploadPanel({
       const result = await extractPdf(file);
       onExtracted(result);
     } catch (caught) {
-      setLocalError(caught instanceof Error ? caught.message : "Could not read that PDF.");
+      const message = caught instanceof Error ? caught.message : "Could not read that PDF.";
+      setLocalError(message);
     }
   }
 
