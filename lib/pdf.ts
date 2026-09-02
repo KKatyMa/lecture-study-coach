@@ -45,6 +45,55 @@ function configurePdfWorker(GlobalWorkerOptions: { workerSrc: string }): void {
   GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
 }
 
+type PdfTextItem = { str?: string };
+type PdfTextContent = {
+  items: PdfTextItem[];
+  styles: Record<string, unknown>;
+  lang: string | null;
+};
+
+type PdfPageLike = {
+  getTextContent?: (params?: unknown) => Promise<PdfTextContent>;
+  streamTextContent?: (params?: unknown) => ReadableStream<{
+    items: PdfTextItem[];
+    styles: Record<string, unknown>;
+    lang?: string | null;
+  }>;
+};
+
+/** Safari lacks ReadableStream async iteration; getTextContent() throws there. */
+async function getSafariSafeTextContent(page: PdfPageLike, params = {}): Promise<PdfTextContent> {
+  if (typeof page.streamTextContent !== "function") {
+    if (typeof page.getTextContent !== "function") {
+      throw new Error("This browser cannot extract text from PDF pages.");
+    }
+    return page.getTextContent(params);
+  }
+
+  const textContent: PdfTextContent = {
+    items: [],
+    styles: Object.create(null) as Record<string, unknown>,
+    lang: null,
+  };
+
+  const reader = page.streamTextContent(params).getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.lang != null) textContent.lang ??= value.lang ?? null;
+      Object.assign(textContent.styles, value.styles);
+      for (const item of value.items) {
+        textContent.items.push(item);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return textContent;
+}
+
 export async function extractPdf(file: File): Promise<ExtractedPdf> {
   if (typeof window === "undefined") {
     throw new Error("PDF extraction runs in the browser.");
@@ -64,7 +113,7 @@ export async function extractPdf(file: File): Promise<ExtractedPdf> {
 
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
     const page = await doc.getPage(pageNumber);
-    const content = await page.getTextContent();
+    const content = await getSafariSafeTextContent(page);
     const text = content.items
       .map((item: { str?: string }) => item.str ?? "")
       .join(" ")
