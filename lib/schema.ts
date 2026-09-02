@@ -76,10 +76,7 @@ export const QuestionSchema = z.object({
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const LlmSettingsSchema = z.object({
-  preset: z.enum(["ollama", "groq", "deepseek", "custom"]),
-  baseUrl: z.string().min(1),
-  model: z.string().min(1),
-  apiKey: z.string().default(""),
+  preset: z.enum(["groq", "ollama"]),
   temperature: z.number().min(0).max(2).default(0.2),
 });
 export type LlmSettings = z.infer<typeof LlmSettingsSchema>;

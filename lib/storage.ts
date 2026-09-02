@@ -59,7 +59,15 @@ export function loadSettings(): LlmSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return LlmSettingsSchema.parse({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // Drop legacy client-side fields (apiKey, baseUrl, model) from older builds.
+    const preset = parsed.preset === "ollama" ? "ollama" : "groq";
+    const temperature = parsed.temperature;
+    return LlmSettingsSchema.parse({
+      ...DEFAULT_SETTINGS,
+      preset,
+      ...(typeof temperature === "number" ? { temperature } : {}),
+    });
   } catch {
     return DEFAULT_SETTINGS;
   }

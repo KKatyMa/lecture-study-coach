@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DEMO_CARDS, DEMO_FILE_NAME, DEMO_HASH, DEMO_OUTLINE, DEMO_PAGE_COUNT, DEMO_WORD_COUNT } from "@/lib/demo";
 import { LlmRequestError, requestCards, requestOutline } from "@/lib/llm-client";
 import { chunkPages } from "@/lib/pdf";
+import { useGroqStatus } from "@/hooks/use-groq-status";
 import { canCallLlm } from "@/lib/providers";
 import { buildQuiz } from "@/lib/quiz";
 import type { Concept, ExtractedPdf, Flashcard, Outline, Question } from "@/lib/schema";
@@ -87,6 +88,9 @@ export function StudyApp() {
   useEffect(() => {
     persist(session);
   }, [session]);
+
+  const groqStatus = useGroqStatus();
+  const llmReady = canCallLlm(settings, groqStatus.configured);
 
   const enabled = useMemo(
     () => ({
@@ -163,8 +167,8 @@ export function StudyApp() {
 
   async function analyzePdf() {
     if (!session.extracted) return;
-    if (!canCallLlm(settings)) {
-      setError("Configure a model in the header, or load the demo lecture.");
+    if (!llmReady) {
+      setError("Add GROQ_API_KEY to .env.local, switch to Ollama, or load the demo lecture.");
       return;
     }
     setBusy(true);
@@ -224,8 +228,8 @@ export function StudyApp() {
       return;
     }
 
-    if (!canCallLlm(settings)) {
-      setError("Configure a model to generate cards from your PDF, or use the demo lecture.");
+    if (!llmReady) {
+      setError("Add GROQ_API_KEY to .env.local, switch to Ollama, or use the demo lecture.");
       return;
     }
 
@@ -319,7 +323,7 @@ export function StudyApp() {
             <AlertDescription className="flex flex-col gap-2">
               <span>{error}</span>
               <span>
-                Check the base URL, model name, and API key. You can still continue with the demo lecture.
+                Check that GROQ_API_KEY is set in .env.local and restart the dev server. You can still continue with the demo lecture.
               </span>
               <div>
                 <Button size="sm" variant="outline" onClick={loadDemo}>
@@ -333,6 +337,7 @@ export function StudyApp() {
         {step === "upload" ? (
           <UploadPanel
             settings={settings}
+            groqConfigured={groqStatus.configured}
             busy={busy}
             error={error}
             extracted={session.extracted}

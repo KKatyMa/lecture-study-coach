@@ -7,7 +7,7 @@ import {
   outlineReducePrompt,
   SYSTEM_PROMPT,
 } from "@/lib/prompts";
-import { authHeaderValue } from "@/lib/providers";
+import { resolveServerLlmConfig } from "@/lib/server-llm";
 import { LlmSettingsSchema, extractJsonObject } from "@/lib/schema";
 
 export const maxDuration = 120;
@@ -54,13 +54,13 @@ function shouldRequestJsonObject(baseUrl: string): boolean {
 }
 
 async function callChat(
-  settings: z.infer<typeof LlmSettingsSchema>,
+  config: ReturnType<typeof resolveServerLlmConfig>,
   prompt: string,
   jsonMode: boolean,
 ): Promise<{ ok: boolean; status: number; text: string }> {
   const payload: Record<string, unknown> = {
-    model: settings.model,
-    temperature: settings.temperature,
+    model: config.model,
+    temperature: config.temperature,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: prompt },
@@ -74,11 +74,11 @@ async function callChat(
   const timeout = setTimeout(() => controller.abort(), 110_000);
 
   try {
-    const response = await fetch(`${settings.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    const response = await fetch(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${authHeaderValue(settings)}`,
+        Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -111,12 +111,13 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     const body = RequestSchema.parse(json);
+    const config = resolveServerLlmConfig(body.settings);
     const prompt = userPrompt(body);
-    const jsonMode = shouldRequestJsonObject(body.settings.baseUrl);
+    const jsonMode = shouldRequestJsonObject(config.baseUrl);
 
-    let result = await callChat(body.settings, prompt, jsonMode);
+    let result = await callChat(config, prompt, jsonMode);
     if (!result.ok && jsonMode && result.status === 400) {
-      result = await callChat(body.settings, prompt, false);
+      result = await callChat(config, prompt, false);
     }
 
     if (!result.ok) {

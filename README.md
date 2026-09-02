@@ -13,26 +13,38 @@ The UI and all generated study material are in English on purpose: the point is 
 
 Sessions are cached in `localStorage` by PDF hash. There is no account and no database.
 
-## Recommended open models (cost control)
+## Models
 
-This app talks to any **OpenAI-compatible** chat endpoint. Closed models work if you point a custom base URL at them, but the defaults are open-weight:
-
-| Goal | Preset | Model |
+| Provider | Where credentials live | Model |
 | --- | --- | --- |
-| Best cheap hosted quality | Groq | `llama-3.3-70b-versatile` |
-| Strong academic extraction | DeepSeek | `deepseek-chat` (DeepSeek-V3) |
-| Fully local, free | Ollama | `qwen2.5:14b` (or `:32b` with 16GB+ VRAM) |
+| **Groq** (default) | `GROQ_API_KEY` in `.env.local` — **server only** | `llama-3.3-70b-versatile` |
+| **Ollama** (local) | No key; server talks to localhost | `qwen2.5:14b` (override with `OLLAMA_MODEL`) |
 
-Avoid 7B-class models as the main extractor: outlines and contrast cards get sloppy. A dummy key is sent for Ollama; Groq and DeepSeek need a real key. Keys never leave the browser except as a `Authorization` header to the URL you set.
+Groq never uses `NEXT_PUBLIC_*` or browser `localStorage` for the API key. The client only knows whether the server has a key configured.
 
 ## Run locally
 
 ```bash
+cp .env.example .env.local
+# edit .env.local and set GROQ_API_KEY=gsk_...
 npm install
 npm run dev
 ```
 
 Open [http://127.0.0.1:43127](http://127.0.0.1:43127).
+
+### Verify Groq
+
+In the app: **Model → Test Groq connection**.
+
+Or from a terminal (dev server must be running):
+
+```bash
+curl -s http://127.0.0.1:43127/api/groq/test | jq
+curl -s http://127.0.0.1:43127/api/groq/status | jq
+```
+
+Restart `npm run dev` after changing `.env.local`.
 
 ### Ollama
 
@@ -41,17 +53,13 @@ ollama pull qwen2.5:14b
 ollama serve
 ```
 
-In **Model**, choose the Ollama preset. No API key.
+In **Model**, choose Ollama. No API key.
 
-### Groq or DeepSeek
-
-Paste a key in **Model**. Groq’s free tier is usually enough for a handful of lectures.
-
-## Demo without a key
+## Demo without Groq
 
 **Load demo lecture** walks the full loop on a STA 621 Bayesian inference / MLE lecture.
 
-**Extract bundled sample PDF** runs the real PDF parser on `public/sample-lecture.pdf`. Generating an outline from that file still needs a model.
+**Extract bundled sample PDF** runs the real PDF parser on `public/sample-lecture.pdf`. Generating an outline from that file still needs Groq or Ollama.
 
 Regenerate the sample PDF:
 
@@ -61,4 +69,8 @@ npm run sample-pdf
 
 ## Stack
 
-Next.js, TypeScript, Tailwind, shadcn/ui, `pdfjs-dist` in the browser, Zod-validated JSON from the model via `app/api/llm/route.ts`.
+Next.js, TypeScript, Tailwind, shadcn/ui, `pdfjs-dist` in the browser, Zod-validated JSON from the model via `app/api/llm/route.ts`, Groq via `app/api/groq/test/route.ts`.
+
+## Note on hydration warnings
+
+If you see a React hydration warning mentioning `monica-id` or `monica-version`, that comes from the Monica browser extension injecting attributes into the DOM. It is not caused by this app.

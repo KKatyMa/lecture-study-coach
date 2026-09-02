@@ -10,6 +10,7 @@ import { FileText, FlaskConical, Loader2, Upload } from "lucide-react";
 
 type UploadPanelProps = {
   settings: LlmSettings;
+  groqConfigured: boolean;
   busy: boolean;
   error: string | null;
   extracted: ExtractedPdf | null;
@@ -20,6 +21,7 @@ type UploadPanelProps = {
 
 export function UploadPanel({
   settings,
+  groqConfigured,
   busy,
   error,
   extracted,
@@ -30,7 +32,7 @@ export function UploadPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const ready = canCallLlm(settings);
+  const ready = canCallLlm(settings, groqConfigured);
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
@@ -114,10 +116,12 @@ export function UploadPanel({
 
           {!ready ? (
             <Alert>
-              <AlertTitle>Add a model to analyse your own PDF</AlertTitle>
+              <AlertTitle>Server model not ready</AlertTitle>
               <AlertDescription>
-                Open Model in the header and paste a Groq or DeepSeek key, or point the base URL at local
-                Ollama. Until then you can still walk the full study loop with the demo lecture.
+                Add <span className="font-mono">GROQ_API_KEY</span> to{" "}
+                <span className="font-mono">.env.local</span> and restart the dev server, or switch
+                to Ollama in Model. Until then you can still walk the full study loop with the demo
+                lecture.
               </AlertDescription>
             </Alert>
           ) : null}

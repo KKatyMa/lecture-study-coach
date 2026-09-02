@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,9 +19,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { testGroqFromClient, useGroqStatus } from "@/hooks/use-groq-status";
 import { PROVIDER_PRESETS, settingsFromPreset } from "@/lib/providers";
 import type { LlmSettings } from "@/lib/schema";
-import { Settings2 } from "lucide-react";
+import { CheckCircle2, Loader2, Settings2, XCircle } from "lucide-react";
 
 type SettingsSheetProps = {
   settings: LlmSettings;
@@ -29,15 +30,26 @@ type SettingsSheetProps = {
 };
 
 export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
-  const presetMeta = useMemo(() => {
-    if (settings.preset === "custom") {
-      return {
-        hint: "Any OpenAI-compatible endpoint: Together, Fireworks, vLLM, LM Studio, OpenRouter, siliconflow, and similar.",
-        needsKey: true,
-      };
+  const groqStatus = useGroqStatus();
+  const [testing, setTesting] = useState(false);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [testOk, setTestOk] = useState<boolean | null>(null);
+
+  const presetMeta = PROVIDER_PRESETS[settings.preset];
+
+  async function runGroqTest() {
+    setTesting(true);
+    setTestMessage(null);
+    setTestOk(null);
+    const result = await testGroqFromClient();
+    setTesting(false);
+    setTestOk(result.ok);
+    if (result.ok) {
+      setTestMessage(`Groq replied: “${result.reply}” (${result.model})`);
+      return;
     }
-    return PROVIDER_PRESETS[settings.preset];
-  }, [settings.preset]);
+    setTestMessage(result.error ?? "Groq test failed.");
+  }
 
   return (
     <Sheet>
@@ -47,14 +59,15 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Open-weight models</SheetTitle>
+          <SheetTitle>Model settings</SheetTitle>
           <SheetDescription>
-            Keys stay in this browser and are sent only to the endpoint you choose. Nothing is stored on a server.
+            Groq credentials live in <code className="text-xs">.env.local</code> on the server. The
+            browser never sees your API key.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-6">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="preset">Provider preset</Label>
+            <Label htmlFor="preset">Provider</Label>
             <Select
               value={settings.preset}
               onValueChange={(value) => {
@@ -68,44 +81,53 @@ export function SettingsSheet({ settings, onChange }: SettingsSheetProps) {
               <SelectContent>
                 <SelectItem value="groq">Groq — Llama 3.3 70B</SelectItem>
                 <SelectItem value="ollama">Ollama — local Qwen2.5</SelectItem>
-                <SelectItem value="deepseek">DeepSeek-V3</SelectItem>
-                <SelectItem value="custom">Custom OpenAI-compatible</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs leading-relaxed text-muted-foreground">{presetMeta.hint}</p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="baseUrl">Base URL</Label>
-            <Input
-              id="baseUrl"
-              value={settings.baseUrl}
-              onChange={(event) => onChange({ ...settings, baseUrl: event.target.value })}
-              placeholder="https://api.groq.com/openai/v1"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="model">Model name</Label>
-            <Input
-              id="model"
-              value={settings.model}
-              onChange={(event) => onChange({ ...settings, model: event.target.value })}
-              placeholder="llama-3.3-70b-versatile"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="apiKey">API key</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              autoComplete="off"
-              value={settings.apiKey}
-              onChange={(event) => onChange({ ...settings, apiKey: event.target.value })}
-              placeholder={settings.preset === "ollama" ? "Not required for Ollama" : "Paste key"}
-            />
-          </div>
+          {settings.preset === "groq" ? (
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium">
+                {groqStatus.loading ? (
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                ) : groqStatus.configured ? (
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                ) : (
+                  <XCircle className="size-4 text-destructive" />
+                )}
+                {groqStatus.loading
+                  ? "Checking server…"
+                  : groqStatus.configured
+                    ? "GROQ_API_KEY is configured on the server"
+                    : "GROQ_API_KEY is missing on the server"}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Model: <span className="font-mono">{groqStatus.model}</span>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                disabled={testing || groqStatus.loading}
+                onClick={() => void runGroqTest()}
+              >
+                {testing ? <Loader2 className="animate-spin" /> : null}
+                Test Groq connection
+              </Button>
+              {testMessage ? (
+                <Alert variant={testOk ? "default" : "destructive"} className="mt-3">
+                  <AlertTitle>{testOk ? "Groq OK" : "Groq API error"}</AlertTitle>
+                  <AlertDescription className="text-xs leading-relaxed">{testMessage}</AlertDescription>
+                </Alert>
+              ) : null}
+            </div>
+          ) : (
+            <p className="rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              Ollama model: <span className="font-mono">{presetMeta.model}</span>. Override with{" "}
+              <span className="font-mono">OLLAMA_MODEL</span> in <span className="font-mono">.env.local</span>.
+            </p>
+          )}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="temperature">Temperature ({settings.temperature.toFixed(1)})</Label>
