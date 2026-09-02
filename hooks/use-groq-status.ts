@@ -24,7 +24,7 @@ export function useGroqStatus(): GroqStatus {
         if (cancelled) return;
         setStatus({
           configured: Boolean(payload.configured),
-          model: payload.model ?? "llama-3.3-70b-versatile",
+          model: payload.model ?? "qwen/qwen3.8-27b",
           loading: false,
         });
       })
